@@ -1,0 +1,18 @@
+# Env
+.env
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# DB
+*.sqlite3
+
+# services/ 配下（api, web, admin, device）はそれぞれ独立したリポジトリとして扱う。
+# このリポジトリはdocker-compose・READMEなどオーケストレーション層のみを管理し、
+# 各サービスの中身は追跡しない（クローン/配置は各自の手順に従う）。
+services/
