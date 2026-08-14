@@ -31,6 +31,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-mysql+pymysql://trapa:trapa_password@db:3306/tracking_parking}
       DEVICE_OFFLINE_THRESHOLD_SECONDS: ${DEVICE_OFFLINE_THRESHOLD_SECONDS:-120}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-client-id.apps.googleusercontent.com}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-14}
@@ -53,6 +54,7 @@ services:
       - "${WEB_PORT:-5173}:5173"
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-your-client-id.apps.googleusercontent.com}
     volumes:
       - ./services/web:/app
       - /app/node_modules
@@ -69,6 +71,7 @@ services:
       - "${ADMIN_WEB_PORT:-5174}:5174"
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-your-client-id.apps.googleusercontent.com}
     volumes:
       - ./services/admin-web:/app
       - /app/node_modules

@@ -82,15 +82,22 @@ docker compose up --build
 
 `api` コンテナは起動時に `alembic upgrade head` を実行してスキーマを作成する。
 
-### 4. 管理者アカウントの作成
+### 4. Google OAuthクライアントIDの設定
 
-Admin（管理コンソール）にログインするには先にアカウントが必要。
+Admin/一般ユーザーともログインはGoogle Sign-Inを使う。Google Cloud ConsoleでOAuthクライアント
+（Webアプリケーション種別、承認済みJavaScript生成元にhttp://localhost:5173とhttp://localhost:5174を追加）
+を作成し、`.env` の `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` に同じ値を設定する。
+
+### 5. 管理者アカウントの許可リスト登録
+
+Admin（管理コンソール）にログインできるのは、あらかじめ許可したGoogleアカウント（実行委員の
+`NN.x.姓.nutfes@gmail.com` 形式のみ）だけ。
 
 ```bash
-docker compose exec api python scripts/create_admin_user.py <username>
+docker compose exec api python scripts/manage_admin_allowlist.py add 25.m.kitano.nutfes@gmail.com
 ```
 
-パスワードは対話プロンプトで入力する。詳細は [api リポジトリのREADME](https://github.com/NUTFes/tracking-parking-api) を参照。
+詳細は [api リポジトリのREADME](https://github.com/NUTFes/tracking-parking-api) を参照。
 
 ### 設定一覧
 
@@ -106,6 +113,8 @@ docker compose exec api python scripts/create_admin_user.py <username>
 | `API_PORT`（`8000`） | api | ホスト側に公開するポート |
 | `DEVICE_OFFLINE_THRESHOLD_SECONDS`（`120`） | api | 最終通信からこの秒数を超えるとデバイスをオフライン扱いにする |
 | `CORS_ORIGINS`（`http://localhost:5173,http://localhost:5174`） | api | ブラウザからのアクセスを許可するオリジン（カンマ区切り）。`WEB_PORT`/`ADMIN_WEB_PORT`を変えたら合わせる |
+| `GOOGLE_CLIENT_ID` | api | Google Sign-InのOAuthクライアントID。Admin・一般ユーザーどちらのIDトークン検証にも使う |
+| `VITE_GOOGLE_CLIENT_ID` | web, admin-web | 同上（フロントエンド用。`GOOGLE_CLIENT_ID`と同じ値にする） |
 | `JWT_SECRET`（`change-me-in-production`） | api | Adminアクセストークンの署名鍵。**本番では必ず固有の値に変更**（`openssl rand -hex 32`） |
 | `ACCESS_TOKEN_EXPIRE_MINUTES`（`15`） | api | Adminアクセストークンの有効期限（分） |
 | `REFRESH_TOKEN_EXPIRE_DAYS`（`14`） | api | Adminリフレッシュトークンの有効期限（日） |
@@ -120,13 +129,13 @@ docker compose exec api python scripts/create_admin_user.py <username>
 ### 動作確認の例
 
 駐車場・デバイスの登録は Admin（http://localhost:5174）の画面から行うのが基本（先に
-[管理者アカウントの作成](#4-管理者アカウントの作成) が必要）。curl で行う場合は以下の通り:
+[Google OAuthクライアントIDの設定](#4-google-oauthクライアントidの設定)と
+[許可リスト登録](#5-管理者アカウントの許可リスト登録)が必要）。ログインはブラウザでのGoogle
+Sign-Inが前提のため、curlで一連の動作を試す場合はAdminにログインした状態のブラウザの開発者
+ツール（Network タブなどでAT/Cookieを確認）からアクセストークンを取得して使う:
 
 ```bash
-# ログインしてアクセストークンを取得
-AT=$(curl -s -c cookies.txt -X POST localhost:8000/api/v1/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username": "<username>", "password": "<password>"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+AT="<Adminにログイン後、ブラウザの開発者ツールから取得したアクセストークン>"
 
 # 駐車場を登録（要ログイン）
 curl -X POST localhost:8000/api/v1/parking-lots \
@@ -144,7 +153,8 @@ curl -X POST localhost:8000/api/v1/events \
   -d '{"event_type": "entry", "detected_at": "2026-08-14T10:00:00"}'
 ```
 
-登録後、Web（http://localhost:5173）で空き台数を確認できる。
+登録後、Web（http://localhost:5173）で空き台数を確認できる。駐車台数の手動増減はWebでGoogleログイン
+すれば操作できる（許可リストは不要、実行委員のメール形式であれば誰でも可）。
 
 ## License
 
