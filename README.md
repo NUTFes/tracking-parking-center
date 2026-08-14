@@ -4,7 +4,7 @@
 API サーバーで受信・DB へ保存し、Web で可視化するセンター側システム。
 
 このリポジトリ自体は **docker-compose・README・ドキュメントなどオーケストレーション層のみ**を
-管理するポリレポ（multi-repo）構成。`services/` 配下の各サービス（api・web・admin-web・device）は
+管理するポリレポ（multi-repo）構成。`services/` 配下の各サービス（api・web・manager・admin-web・device）は
 それぞれ独立したリポジトリで、このリポジトリの管理下には含まない（`.gitignore` で `services/` を
 丸ごと対象外にしている）。各サービスの詳しい設計・開発手順は、それぞれのリポジトリのREADMEを参照。
 
@@ -14,8 +14,9 @@ API サーバーで受信・DB へ保存し、Web で可視化するセンター
 tracking-parking-center/        ← このリポジトリ（オーケストレーション層のみ）
 ├── services/                   ← git管理外（.gitignore）。各サービスは独立したリポジトリを個別にclone
 │   ├── api/        FastAPI + MySQL — REST API、デバイス認証、コマンドキュー
-│   ├── web/        React + Vite — 公開ビューア（各駐車場の空き台数を閲覧するだけの画面。操作は一切なし）
-│   ├── admin-web/  React + Vite — 管理コンソール（駐車場・デバイスの登録、再起動などの操作）
+│   ├── web/        React + Vite — 公開ビューア（各駐車場の台数を閲覧するだけの画面。ログイン不要・操作は一切なし）
+│   ├── manager/     React + Vite — 駐車場管理者コンソール（サインインした人だけ台数を手動増減）
+│   ├── admin-web/  React + Vite — 管理コンソール（駐車場・デバイスの登録、削除、リセットなどの操作）
 │   └── device/     現場のエッジデバイス側実装（https://github.com/NUTFes/tracking-parking）。
 │                    docker compose の起動対象外
 └── docker-compose.yml
@@ -25,12 +26,21 @@ tracking-parking-center/        ← このリポジトリ（オーケストレ�
 |---|---|---|
 | api | [tracking-parking-api](https://github.com/NUTFes/tracking-parking-api) | アーキテクチャ・認証設計・DBスキーマ・API仕様・バックエンド開発手順 |
 | web | [tracking-parking-web](https://github.com/NUTFes/tracking-parking-web) | 公開ビューアのフロントエンド開発手順 |
+| manager | [tracking-parking-manager](https://github.com/NUTFes/tracking-parking-manager) | 駐車場管理者コンソールのフロントエンド開発手順・クライアント側認証の実装 |
 | admin-web | [tracking-parking-admin-web](https://github.com/NUTFes/tracking-parking-admin-web) | 管理コンソールのフロントエンド開発手順・クライアント側認証の実装 |
 | device | [tracking-parking](https://github.com/NUTFes/tracking-parking) | エッジデバイス側の実装（別チーム管理） |
 
-`web`（空き状況の閲覧）と `admin-web`（登録・操作）を別サービスに分けているのは、閲覧用の画面を
-不特定多数に公開しても、デバイス再起動のような操作系エンドポイントを誤って触れないようにするため。
-`admin-web` はユーザー認証で保護されている（詳細は [api リポジトリのREADME](https://github.com/NUTFes/tracking-parking-api) 参照）。
+3段階の権限に分かれている:
+
+- **web**（公開ビューア）: ログイン不要、閲覧のみ。不特定多数に公開しても操作系エンドポイントに
+  誤って触れる心配がない。
+- **manager**（駐車場管理者）: 実行委員のGoogleアカウント（`NN.x.姓.nutfes@gmail.com`形式、承認リスト
+  不要）でサインインすると使える。各駐車場の台数を手動増減できるだけで、駐車場・デバイスの登録や
+  削除はできない。
+- **admin-web**（管理者）: あらかじめ許可したGoogleアカウントのみ（承認リストあり）。駐車場・
+  デバイスの登録／編集／削除、台数のリセット、デバイス再起動など、強い操作権限を持つ。
+
+認証設計の詳細は [api リポジトリのREADME](https://github.com/NUTFes/tracking-parking-api) を参照。
 
 ## 初期セットアップ
 
@@ -38,7 +48,7 @@ tracking-parking-center/        ← このリポジトリ（オーケストレ�
 
 - Docker / Docker Compose（これだけあれば起動できる）
 - ローカルでフロントエンド/バックエンドを直接動かす場合のみ追加で必要:
-  Node.js（`services/web`・`services/admin-web` の `package.json` 参照）、Python 3.12（`services/api`）
+  Node.js（`services/web`・`services/manager`・`services/admin-web` の `package.json` 参照）、Python 3.12（`services/api`）
 
 ### 1. clone
 
@@ -50,6 +60,7 @@ cd tracking-parking-center
 
 git clone https://github.com/NUTFes/tracking-parking-api services/api
 git clone https://github.com/NUTFes/tracking-parking-web services/web
+git clone https://github.com/NUTFes/tracking-parking-manager services/manager
 git clone https://github.com/NUTFes/tracking-parking-admin-web services/admin-web
 git clone https://github.com/NUTFes/tracking-parking services/device
 ```
@@ -66,8 +77,8 @@ cp .env.example .env
 
 ローカル開発でDocker Composeから起動するだけなら既定値のままで動く。各変数の意味は
 [設定一覧](#設定一覧)を参照。フロントエンドを `docker compose` 経由ではなく直接
-`npm run dev` で動かす場合は `services/web/.env.example` ・ `services/admin-web/.env.example`
-もそれぞれ `.env` としてコピーする（中身は `VITE_API_BASE_URL` のみ）。
+`npm run dev` で動かす場合は `services/web/.env.example` ・ `services/manager/.env.example` ・
+`services/admin-web/.env.example` もそれぞれ `.env` としてコピーする。
 
 ### 3. 起動
 
@@ -77,6 +88,7 @@ docker compose up --build
 
 - API: http://localhost:8000 （Swagger UI: http://localhost:8000/docs, ReDoc: http://localhost:8000/redoc）
 - Web（公開ビューア）: http://localhost:5173
+- Manager（駐車場管理者）: http://localhost:5175
 - Admin（管理コンソール）: http://localhost:5174
 - MySQL: localhost:3306
 
@@ -84,14 +96,16 @@ docker compose up --build
 
 ### 4. Google OAuthクライアントIDの設定
 
-Admin/一般ユーザーともログインはGoogle Sign-Inを使う。Google Cloud ConsoleでOAuthクライアント
-（Webアプリケーション種別、承認済みJavaScript生成元にhttp://localhost:5173とhttp://localhost:5174を追加）
-を作成し、`.env` の `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` に同じ値を設定する。
+Manager/AdminともログインはGoogle Sign-Inを使う。Google Cloud ConsoleでOAuthクライアント
+（Webアプリケーション種別、承認済みJavaScript生成元にhttp://localhost:5174とhttp://localhost:5175を追加。
+`web`はログイン機能自体を持たないため追加不要）を作成し、`.env` の `GOOGLE_CLIENT_ID` /
+`VITE_GOOGLE_CLIENT_ID` に同じ値を設定する。
 
 ### 5. 管理者アカウントの許可リスト登録
 
 Admin（管理コンソール）にログインできるのは、あらかじめ許可したGoogleアカウント（実行委員の
-`NN.x.姓.nutfes@gmail.com` 形式のみ）だけ。
+`NN.x.姓.nutfes@gmail.com` 形式のみ）だけ。Manager（駐車場管理者コンソール）は許可リスト不要
+（フォーマットが正しいアカウントなら誰でもログインできる）なので、この登録は不要。
 
 ```bash
 docker compose exec api python scripts/manage_admin_allowlist.py add 25.m.kitano.nutfes@gmail.com
@@ -112,16 +126,17 @@ docker compose exec api python scripts/manage_admin_allowlist.py add 25.m.kitano
 | `DATABASE_URL` | api | SQLAlchemyの接続文字列。`MYSQL_*` を変更したらここも合わせて変更する |
 | `API_PORT`（`8000`） | api | ホスト側に公開するポート |
 | `DEVICE_OFFLINE_THRESHOLD_SECONDS`（`120`） | api | 最終通信からこの秒数を超えるとデバイスをオフライン扱いにする |
-| `CORS_ORIGINS`（`http://localhost:5173,http://localhost:5174`） | api | ブラウザからのアクセスを許可するオリジン（カンマ区切り）。`WEB_PORT`/`ADMIN_WEB_PORT`を変えたら合わせる |
-| `GOOGLE_CLIENT_ID` | api | Google Sign-InのOAuthクライアントID。Admin・一般ユーザーどちらのIDトークン検証にも使う |
-| `VITE_GOOGLE_CLIENT_ID` | web, admin-web | 同上（フロントエンド用。`GOOGLE_CLIENT_ID`と同じ値にする） |
+| `CORS_ORIGINS`（`http://localhost:5173,http://localhost:5174,http://localhost:5175`） | api | ブラウザからのアクセスを許可するオリジン（カンマ区切り）。各`*_PORT`を変えたら合わせる |
+| `GOOGLE_CLIENT_ID` | api | Google Sign-InのOAuthクライアントID。Manager・AdminどちらのIDトークン検証にも使う |
+| `VITE_GOOGLE_CLIENT_ID` | manager, admin-web | 同上（フロントエンド用。`GOOGLE_CLIENT_ID`と同じ値にする） |
 | `JWT_SECRET`（`change-me-in-production`） | api | Adminアクセストークンの署名鍵。**本番では必ず固有の値に変更**（`openssl rand -hex 32`） |
 | `ACCESS_TOKEN_EXPIRE_MINUTES`（`15`） | api | Adminアクセストークンの有効期限（分） |
 | `REFRESH_TOKEN_EXPIRE_DAYS`（`14`） | api | Adminリフレッシュトークンの有効期限（日） |
 | `COOKIE_SECURE`（`false`） | api | リフレッシュトークンCookieの `Secure` 属性。HTTPS配下でのみ `true` にできる |
 | `WEB_PORT`（`5173`） | web | ホスト側に公開するポート |
+| `MANAGER_PORT`（`5175`） | manager | ホスト側に公開するポート |
 | `ADMIN_WEB_PORT`（`5174`） | admin-web | ホスト側に公開するポート |
-| `VITE_API_BASE_URL`（`http://localhost:8000`） | web, admin-web | フロントエンドが呼び出すAPIのベースURL。Viteのビルド時に埋め込まれる |
+| `VITE_API_BASE_URL`（`http://localhost:8000`） | web, manager, admin-web | フロントエンドが呼び出すAPIのベースURL。Viteのビルド時に埋め込まれる |
 
 本番運用時の注意点（`JWT_SECRET`・`COOKIE_SECURE`など）の詳細は
 [api リポジトリのREADME](https://github.com/NUTFes/tracking-parking-api) を参照。
@@ -153,8 +168,9 @@ curl -X POST localhost:8000/api/v1/events \
   -d '{"event_type": "entry", "detected_at": "2026-08-14T10:00:00"}'
 ```
 
-登録後、Web（http://localhost:5173）で空き台数を確認できる。駐車台数の手動増減はWebでGoogleログイン
-すれば操作できる（許可リストは不要、実行委員のメール形式であれば誰でも可）。
+登録後、Web（http://localhost:5173）で台数を確認できる。台数の手動増減はManager
+（http://localhost:5175）でGoogleサインインすれば操作できる（許可リストは不要、実行委員の
+メール形式であれば誰でも可）。
 
 ## License
 
