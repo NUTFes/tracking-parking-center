@@ -1,4 +1,4 @@
-# トラパ 駐車場管理センター (tracking-parking-center)
+# Tracking-Parking (tracking-parking-center)
 
 現場のエッジデバイス（[device](https://github.com/NUTFes/tracking-parking)）が検出した駐車場の入出庫イベントを
 API サーバーで受信・DB へ保存し、Web で可視化するセンター側システム。
