@@ -1,0 +1,112 @@
+# Standalone production stack — used as-is on both the staging server and the
+# production server, differing only in which .env file is loaded (see
+# .env.staging.example / .env.production.example). Unlike docker-compose.yml
+# (local dev): no source bind-mounts (code is baked into the image at build
+# time), frontends are built static bundles served by nginx (not the Vite dev
+# server), and nothing is published to the internet directly — cloudflared
+# reaches every service over the compose network by service name, so the only
+# ports open here are loopback-only (127.0.0.1), for optional SSH-tunnel
+# debugging.
+services:
+  db:
+    image: mysql:9.2.0
+    platform: linux/amd64
+    container_name: trapa-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: ${TZ:-Asia/Tokyo}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./services/api
+    container_name: trapa-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DEVICE_OFFLINE_THRESHOLD_SECONDS: ${DEVICE_OFFLINE_THRESHOLD_SECONDS:-120}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-14}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      TZ: ${TZ:-Asia/Tokyo}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    container_name: trapa-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:80"
+    depends_on:
+      - api
+
+  manager:
+    build:
+      context: ./services/manager
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+    container_name: trapa-manager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MANAGER_PORT:-5175}:80"
+    depends_on:
+      - api
+
+  admin-web:
+    build:
+      context: ./services/admin-web
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+    container_name: trapa-admin-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ADMIN_WEB_PORT:-5174}:80"
+    depends_on:
+      - api
+
+  # Publishes web/manager/admin-web/api to the internet without opening any
+  # inbound port on this host — the tunnel is configured remotely (public
+  # hostname → http://<service>:<port> ingress rules) in the Cloudflare Zero
+  # Trust dashboard; this container just needs the tunnel token. See the
+  # "デプロイ（ステージング／本番）" section in README.md for setup steps.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: trapa-cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api
+      - web
+      - manager
+      - admin-web
+
+volumes:
+  db-data:
+    name: trapa-db-data

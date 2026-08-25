@@ -19,7 +19,9 @@ tracking-parking-center/        ← このリポジトリ（オーケストレ�
 │   ├── admin-web/  React + Vite — 管理コンソール（駐車場・デバイスの登録、削除、リセットなどの操作）
 │   └── device/     現場のエッジデバイス側実装（https://github.com/NUTFes/tracking-parking）。
 │                    docker compose の起動対象外
-└── docker-compose.yml
+├── docker-compose.yml       ← ローカル開発用
+├── docker-compose.prod.yml  ← staging・production共通（デプロイ参照）
+└── scripts/deploy.sh        ← staging・productionサーバー上で実行するデプロイスクリプト
 ```
 
 | サービス | リポジトリ | 詳細 |
@@ -171,6 +173,92 @@ curl -X POST localhost:8000/api/v1/events \
 登録後、Web（http://localhost:5173）で台数を確認できる。台数の手動増減はManager
 （http://localhost:5175）でGoogleサインインすれば操作できる（許可リストは不要、実行委員の
 メール形式であれば誰でも可）。
+
+## デプロイ（ステージング／本番）
+
+staging・productionはそれぞれ独立したサーバー（VPS等）1台ずつで動かす。両サーバーとも
+このリポジトリ＋`services/*`の各リポジトリを配置し、同じ `docker-compose.prod.yml` を使う
+（内容は環境ごとに置く `.env` の値だけで変わる）。ローカル開発用の `docker-compose.yml`
+との違い:
+
+- ソースをbind mountせず、`docker compose build` 時にイメージへ焼き込む
+- フロントエンド（web/manager/admin-web）はViteの開発サーバーではなく、`npm run build`
+  した静的ファイルをnginxで配信する本番用イメージ（各サービスの `Dockerfile.prod`）を使う
+- どのポートもインターネットには直接公開しない。外部公開は [Cloudflare
+  Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+  経由（`cloudflared` コンテナがcompose内部ネットワーク経由で各サービスにアクセスし、
+  トンネル越しにHTTPS公開する）。ホスト側に公開されるのは `127.0.0.1` 宛のポートのみ
+  （SSHポートフォワードでのデバッグ用）
+
+### 1. サーバーの準備
+
+各サーバー（staging用・production用）で、[初期セットアップ](#初期セットアップ)の手順1と
+同様にこのリポジトリと `services/api`・`services/web`・`services/manager`・
+`services/admin-web` をcloneする（`services/device` は不要）。Docker / Docker Composeが
+使えること。
+
+### 2. Cloudflare Tunnelの作成
+
+環境ごとに（staging用・production用で別々に）[Cloudflare Zero Trust
+ダッシュボード](https://one.dash.cloudflare.com/)でTunnelを1つ作成し、公開ホスト名を
+4つ、それぞれ内部サービスへのingressとして設定する（ポートはこのリポジトリの
+`docker-compose.prod.yml` に合わせる）:
+
+| 公開ホスト名（例） | 転送先 |
+|---|---|
+| `web-staging.<your-domain>` | `http://web:80` |
+| `manager-staging.<your-domain>` | `http://manager:80` |
+| `admin-staging.<your-domain>` | `http://admin-web:80` |
+| `api-staging.<your-domain>` | `http://api:8000` |
+
+（productionも同様に `web.<your-domain>` などで作成する。）Dockerでのインストール
+コマンドに含まれるトンネルトークン（`--token` の値）を、次の手順で `.env` の
+`CLOUDFLARE_TUNNEL_TOKEN` に設定する。
+
+### 3. `.env` の作成
+
+```bash
+# staging サーバー
+cp .env.staging.example .env
+
+# production サーバー
+cp .env.production.example .env
+```
+
+`MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` / `JWT_SECRET` は `openssl rand -hex 32` で生成し、
+staging・productionで別々の値にする。`CORS_ORIGINS` / `VITE_API_BASE_URL` は手順2で決めた
+ドメインに合わせる。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は、Google Cloud Console
+のOAuthクライアントの「承認済みJavaScript生成元」に該当環境の `manager-*` /
+`admin-*` ドメインを追加してから設定する（1つのクライアントにstaging・production両方の
+オリジンを追加してもよい）。
+
+### 4. デプロイ
+
+```bash
+./scripts/deploy.sh
+# または
+make deploy
+```
+
+`services/*` を `git pull` してから `docker compose -f docker-compose.prod.yml --env-file
+.env up -d --build` する。2回目以降のデプロイも同じコマンドでよい。ログは
+`docker compose -f docker-compose.prod.yml logs -f <サービス名>` で確認する。
+
+### 5. 管理者アカウントの許可リスト登録（デプロイ環境）
+
+[ローカルの手順](#5-管理者アカウントの許可リスト登録)と同様だが、`-f
+docker-compose.prod.yml --env-file .env` を付ける:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env exec api \
+  python scripts/manage_admin_allowlist.py add 25.m.kitano.nutfes@gmail.com
+```
+
+### 運用メモ
+
+- DBのバックアップ（`mysqldump`の定期実行など）はこのリポジトリには含まれていない。
+  必要に応じて別途cron等で用意する
+- MySQLの一時ファイル肥大化・ディスク容量など、長期運用時の監視は運用者側の責任
 
 ## License
 
