@@ -71,21 +71,29 @@ git clone https://github.com/NUTFes/tracking-parking services/device
 個別に動かすもの）ので、API連携仕様を確認する参照用途が中心。いずれも `services/` ごと
 `.gitignore` されているため、このリポジトリの `git status` / `git add` には影響しない。
 
-### 2. `.env` の作成
+### 2. `.env.develop` の作成
+
+staging・production用の `.env.staging` / `.env.production`（後述の「デプロイ（ステージング／本番）」
+セクション参照）と並べたときに紛らわしくならないよう、ローカル開発用は `.env.develop` という名前にしている
+（`docker compose` はこの名前を自動では読まないため、起動時は毎回 `--env-file .env.develop`
+を明示するか、後述の `make dev` を使う）。
 
 ```bash
-cp .env.example .env
+cp .env.develop.example .env.develop
 ```
 
 ローカル開発でDocker Composeから起動するだけなら既定値のままで動く。各変数の意味は
 [設定一覧](#設定一覧)を参照。フロントエンドを `docker compose` 経由ではなく直接
 `npm run dev` で動かす場合は `services/web/.env.example` ・ `services/manager/.env.example` ・
-`services/admin-web/.env.example` もそれぞれ `.env` としてコピーする。
+`services/admin-web/.env.example` もそれぞれ `.env` としてコピーする（これらは各サービス
+リポジトリ内で完結する別物で、`.env.develop` とは無関係）。
 
 ### 3. 起動
 
 ```bash
-docker compose up --build
+docker compose --env-file .env.develop up --build
+# または
+make dev
 ```
 
 - API: http://localhost:8000 （Swagger UI: http://localhost:8000/docs, ReDoc: http://localhost:8000/redoc）
@@ -100,8 +108,10 @@ docker compose up --build
 
 Manager/AdminともログインはGoogle Sign-Inを使う。Google Cloud ConsoleでOAuthクライアント
 （Webアプリケーション種別、承認済みJavaScript生成元にhttp://localhost:5174とhttp://localhost:5175を追加。
-`web`はログイン機能自体を持たないため追加不要）を作成し、`.env` の `GOOGLE_CLIENT_ID` /
-`VITE_GOOGLE_CLIENT_ID` に同じ値を設定する。
+`web`はログイン機能自体を持たないため追加不要）を作成し、`.env.develop` の `GOOGLE_CLIENT_ID` /
+`VITE_GOOGLE_CLIENT_ID` に同じ値を設定する。このクライアントはstaging・productionとも
+共有する（デプロイ先のドメインを承認済みJavaScript生成元に追加するだけで、クライアントID
+自体は使い回す。詳細はデプロイ手順を参照）。
 
 ### 5. 管理者アカウントの許可リスト登録
 
@@ -117,7 +127,7 @@ docker compose exec api python scripts/manage_admin_allowlist.py add 25.m.kitano
 
 ### 設定一覧
 
-`.env`（ルート、Docker Compose用）の変数一覧。カッコ内は既定値。
+`.env.develop`（ルート、ローカル開発のDocker Compose用）の変数一覧。カッコ内は既定値。
 
 | 変数 | 対象 | 説明 |
 |---|---|---|
@@ -231,11 +241,11 @@ cp .env.production .env
 （テンプレートのみの `.env.staging.example` / `.env.production.example` はコミット済みで、
 値を1から作り直す場合の参照用。）`MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` / `JWT_SECRET` は
 staging・productionで別々の値を生成済み。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は
-まだプレースホルダーのまま — Google Cloud Console（APIs & Services > 認証情報）で
-staging・production共通の1つのOAuthクライアントIDを作成し、「承認済みJavaScript生成元」に
+ローカル開発（`.env.develop`）と同じクライアントIDを設定済み — ただしGCP側での
+「承認済みJavaScript生成元」への追加はまだなので、Google Cloud Consoleでこのクライアントに
 `manager.trapa.nutfes.net` / `admin.trapa.nutfes.net` / `stg.manager.trapa.nutfes.net` /
-`stg.admin.trapa.nutfes.net` の4つを全て追加してから、両方の`.env`に同じ値を設定する。
-`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が設定する。
+`stg.admin.trapa.nutfes.net` の4つを追加する必要がある（追加するまで該当ドメインでの
+ログインは失敗する）。`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が設定する。
 
 ### 4. デプロイ
 
