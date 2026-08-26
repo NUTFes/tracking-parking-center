@@ -232,10 +232,10 @@ cp .env.production .env
 値を1から作り直す場合の参照用。）`MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` / `JWT_SECRET` は
 staging・productionで別々の値を生成済み。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は
 まだプレースホルダーのまま — Google Cloud Console（APIs & Services > 認証情報）で
-OAuthクライアントIDを作成し、「承認済みJavaScript生成元」に該当環境の `manager*` /
-`admin*` ドメインを追加してから値を設定する（1つのクライアントにstaging・production両方の
-オリジンを追加してもよい）。`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が
-設定する。
+staging・production共通の1つのOAuthクライアントIDを作成し、「承認済みJavaScript生成元」に
+`manager.trapa.nutfes.net` / `admin.trapa.nutfes.net` / `stg.manager.trapa.nutfes.net` /
+`stg.admin.trapa.nutfes.net` の4つを全て追加してから、両方の`.env`に同じ値を設定する。
+`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が設定する。
 
 ### 4. デプロイ
 
