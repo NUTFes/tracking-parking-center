@@ -116,6 +116,13 @@ Admin（管理コンソール）にログインできるのは、あらかじめ
 `NN.x.姓.nutfes@gmail.com` 形式のみ）だけ。Manager（駐車場管理者コンソール）は許可リスト不要
 （フォーマットが正しいアカウントなら誰でもログインできる）なので、この登録は不要。
 
+`25.m.kitano.nutfes@gmail.com` は最初の起動時（`api`コンテナの起動コマンド、`docker-compose.yml`
+参照）に自動で許可リストへ登録される。dev・staging・productionすべて共通で、既に登録済みなら
+何もしない（べき等）ので、初回セットアップとしてはこれで完了 — このアカウントでAdminに
+ログインし、他の実行委員は管理コンソールの画面から追加していけばよい。
+
+CLIで追加・削除したい場合（このアカウント自体が使えなくなった場合の復旧など）は:
+
 ```bash
 docker compose exec api python scripts/manage_admin_allowlist.py add 25.m.kitano.nutfes@gmail.com
 ```
@@ -258,8 +265,11 @@ make deploy
 
 ### 5. 管理者アカウントの許可リスト登録（デプロイ環境）
 
-[ローカルの手順](#5-管理者アカウントの許可リスト登録)と同様だが、`-f
-docker-compose.prod.yml --env-file .env` を付ける:
+[ローカルの手順](#5-管理者アカウントの許可リスト登録)と同じく、`25.m.kitano.nutfes@gmail.com`は
+`api`起動時に自動で登録される（`docker-compose.prod.yml`参照）ので、追加の作業は不要。このアカウントで
+Adminにログインし、他の実行委員は管理コンソールから追加する。
+
+CLIで追加・削除したい場合は`-f docker-compose.prod.yml --env-file .env`を付ける:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env exec api \
