@@ -202,35 +202,40 @@ staging・productionはそれぞれ独立したサーバー（VPS等）1台ず�
 環境ごとに（staging用・production用で別々に）[Cloudflare Zero Trust
 ダッシュボード](https://one.dash.cloudflare.com/)でTunnelを1つ作成し、公開ホスト名を
 4つ、それぞれ内部サービスへのingressとして設定する（ポートはこのリポジトリの
-`docker-compose.prod.yml` に合わせる）:
+`docker-compose.prod.yml` に合わせる）。staging用ドメインには `stg.` プレフィックスを
+付ける:
 
-| 公開ホスト名（例） | 転送先 |
-|---|---|
-| `web-staging.<your-domain>` | `http://web:80` |
-| `manager-staging.<your-domain>` | `http://manager:80` |
-| `admin-staging.<your-domain>` | `http://admin-web:80` |
-| `api-staging.<your-domain>` | `http://api:8000` |
+| 公開ホスト名（production） | 公開ホスト名（staging） | 転送先 |
+|---|---|---|
+| `app.trapa.nutfes.net` | `stg.app.trapa.nutfes.net` | `http://web:80` |
+| `manager.trapa.nutfes.net` | `stg.manager.trapa.nutfes.net` | `http://manager:80` |
+| `admin.trapa.nutfes.net` | `stg.admin.trapa.nutfes.net` | `http://admin-web:80` |
+| `api.trapa.nutfes.net` | `stg.api.trapa.nutfes.net` | `http://api:8000` |
 
-（productionも同様に `web.<your-domain>` などで作成する。）Dockerでのインストール
-コマンドに含まれるトンネルトークン（`--token` の値）を、次の手順で `.env` の
-`CLOUDFLARE_TUNNEL_TOKEN` に設定する。
+Dockerでのインストールコマンドに含まれるトンネルトークン（`--token` の値）を、次の手順で
+`.env` の `CLOUDFLARE_TUNNEL_TOKEN` に設定する。
 
 ### 3. `.env` の作成
 
+`.env.staging` / `.env.production`（実際の値入り、gitignore対象）をリポジトリ直下に
+用意済み。デプロイ時は該当する方をそのサーバーへ転送し、`.env` としてコピーして使う:
+
 ```bash
 # staging サーバー
-cp .env.staging.example .env
+cp .env.staging .env
 
 # production サーバー
-cp .env.production.example .env
+cp .env.production .env
 ```
 
-`MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` / `JWT_SECRET` は `openssl rand -hex 32` で生成し、
-staging・productionで別々の値にする。`CORS_ORIGINS` / `VITE_API_BASE_URL` は手順2で決めた
-ドメインに合わせる。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は、Google Cloud Console
-のOAuthクライアントの「承認済みJavaScript生成元」に該当環境の `manager-*` /
-`admin-*` ドメインを追加してから設定する（1つのクライアントにstaging・production両方の
-オリジンを追加してもよい）。
+（テンプレートのみの `.env.staging.example` / `.env.production.example` はコミット済みで、
+値を1から作り直す場合の参照用。）`MYSQL_ROOT_PASSWORD` / `MYSQL_PASSWORD` / `JWT_SECRET` は
+staging・productionで別々の値を生成済み。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は
+まだプレースホルダーのまま — Google Cloud Console（APIs & Services > 認証情報）で
+OAuthクライアントIDを作成し、「承認済みJavaScript生成元」に該当環境の `manager*` /
+`admin*` ドメインを追加してから値を設定する（1つのクライアントにstaging・production両方の
+オリジンを追加してもよい）。`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が
+設定する。
 
 ### 4. デプロイ
 

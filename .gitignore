@@ -1,5 +1,8 @@
-# Env
+# Env — 実際の値が入ったファイルは全て対象外。.env.staging.example /
+# .env.production.example のような、プレースホルダーのみのテンプレートだけ追跡する。
 .env
+.env.*
+!.env.*.example
 .DS_Store
 
 # Python
