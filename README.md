@@ -83,10 +83,7 @@ cp .env.develop.example .env.develop
 ```
 
 ローカル開発でDocker Composeから起動するだけなら既定値のままで動く。各変数の意味は
-[設定一覧](#設定一覧)を参照。フロントエンドを `docker compose` 経由ではなく直接
-`npm run dev` で動かす場合は `services/web/.env.example` ・ `services/manager/.env.example` ・
-`services/admin-web/.env.example` もそれぞれ `.env` としてコピーする（これらは各サービス
-リポジトリ内で完結する別物で、`.env.develop` とは無関係）。
+[設定一覧](#設定一覧)を参照。
 
 ### 3. 起動
 
