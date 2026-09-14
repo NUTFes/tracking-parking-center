@@ -221,10 +221,10 @@ staging・productionはそれぞれ独立したサーバー（VPS等）1台ず�
 
 | 公開ホスト名（production） | 公開ホスト名（staging） | 転送先 |
 |---|---|---|
-| `app.trapa.nutfes.net` | `stg.app.trapa.nutfes.net` | `http://web:80` |
-| `manager.trapa.nutfes.net` | `stg.manager.trapa.nutfes.net` | `http://manager:80` |
-| `admin.trapa.nutfes.net` | `stg.admin.trapa.nutfes.net` | `http://admin-web:80` |
-| `api.trapa.nutfes.net` | `stg.api.trapa.nutfes.net` | `http://api:8000` |
+| `app-trapa.nutfes.net` | `stg-app-trapa.nutfes.net` | `http://web:80` |
+| `manager-trapa.nutfes.net` | `stg-manager-trapa.nutfes.net` | `http://manager:80` |
+| `admin-trapa.nutfes.net` | `stg-admin-trapa.nutfes.net` | `http://admin-web:80` |
+| `api-trapa.nutfes.net` | `stg-api-trapa.nutfes.net` | `http://api:8000` |
 
 Dockerでのインストールコマンドに含まれるトンネルトークン（`--token` の値）を、次の手順で
 `.env` の `CLOUDFLARE_TUNNEL_TOKEN` に設定する。
@@ -247,8 +247,8 @@ cp .env.production .env
 staging・productionで別々の値を生成済み。`GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` は
 ローカル開発（`.env.develop`）と同じクライアントIDを設定済み — ただしGCP側での
 「承認済みJavaScript生成元」への追加はまだなので、Google Cloud Consoleでこのクライアントに
-`manager.trapa.nutfes.net` / `admin.trapa.nutfes.net` / `stg.manager.trapa.nutfes.net` /
-`stg.admin.trapa.nutfes.net` の4つを追加する必要がある（追加するまで該当ドメインでの
+`manager-trapa.nutfes.net` / `admin-trapa.nutfes.net` / `stg-manager-trapa.nutfes.net` /
+`stg-admin-trapa.nutfes.net` の4つを追加する必要がある（追加するまで該当ドメインでの
 ログインは失敗する）。`CLOUDFLARE_TUNNEL_TOKEN` も、Tunnel作成後にインフラ担当が設定する。
 
 ### 4. デプロイ
