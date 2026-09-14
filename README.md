@@ -178,10 +178,12 @@ curl -X POST localhost:8000/api/v1/devices \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $AT" \
   -d '{"device_code": "trapa-dev1", "parking_lot_id": 1}'
 
-# 入庫イベントを登録（デバイスのAPIキーで認証、ログイン不要）
+# 入庫イベントを登録（デバイスのAPIキーで認証、ログイン不要）。非同期処理のため202を返す。
+# request_id はクライアント（デバイス）が生成する冪等キー（UUID）。同じ値で再送しても
+# 重複登録されない（レスポンスがタイムアウトした際のリトライを想定）
 curl -X POST localhost:8000/api/v1/events \
   -H 'Content-Type: application/json' -H 'X-API-Key: <上で取得したapi_key>' \
-  -d '{"event_type": "entry", "detected_at": "2026-08-14T10:00:00"}'
+  -d '{"request_id": "'$(uuidgen)'", "event_type": "entry", "detected_at": "2026-08-14T10:00:00"}'
 ```
 
 登録後、Web（http://localhost:5173）で台数を確認できる。台数の手動増減はManager
